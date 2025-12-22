@@ -1,0 +1,54 @@
+{
+  "backbone": "resnet18",
+  "img_size": 224,
+  "classes": {
+    "0": "NORMAL",
+    "1": "PNEUMONIA"
+  },
+  "class_to_idx": {
+    "NORMAL": 0,
+    "PNEUMONIA": 1
+  },
+  "metrics_test": {
+    "report": {
+      "0": {
+        "precision": 0.9787234042553191,
+        "recall": 0.5897435897435898,
+        "f1-score": 0.736,
+        "support": 234.0
+      },
+      "1": {
+        "precision": 0.8012422360248447,
+        "recall": 0.9923076923076923,
+        "f1-score": 0.8865979381443299,
+        "support": 390.0
+      },
+      "accuracy": 0.8413461538461539,
+      "macro avg": {
+        "precision": 0.8899828201400819,
+        "recall": 0.7910256410256411,
+        "f1-score": 0.8112989690721649,
+        "support": 624.0
+      },
+      "weighted avg": {
+        "precision": 0.8677976741112726,
+        "recall": 0.8413461538461539,
+        "f1-score": 0.8301237113402061,
+        "support": 624.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        138,
+        96
+      ],
+      [
+        3,
+        387
+      ]
+    ],
+    "auroc": 0.9364234056541749
+  },
+  "seed": 42,
+  "device_trained_on": "cpu"
+}
