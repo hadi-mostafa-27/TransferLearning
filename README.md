@@ -8,7 +8,8 @@
 ⚠️ **Disclaimer**: This project is for educational and research purposes only. It is **not a medical device** and must not be used for clinical decision-making.
 
 ---
-![Uploading Screenshot 2025-12-22 152927.png…]()
+<img width="885" height="893" alt="Screenshot 2025-12-22 152927" src="https://github.com/user-attachments/assets/11b62cd1-88f2-4315-b691-400593fbb892" />
+
 
 ## 📌 Project Overview
 
@@ -256,5 +257,6 @@ Focus areas:
 This project is released for **educational and academic use only**.
 
 ---
+
 
 
