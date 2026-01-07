@@ -7,8 +7,6 @@ import os
 from app.schema import PredictResponse
 from app.inference import InferenceService
 
-
-
 APP_DISCLAIMER = "Educational demo only. Not a medical device. Do not use for clinical decisions."
 
 app = FastAPI(title="MedXfer API", version="1.0.0")
@@ -43,9 +41,11 @@ def model_info():
 @app.post("/predict", response_model=PredictResponse)
 async def predict(file: UploadFile = File(...)):
     content = await file.read()
-    img = Image.open(io.BytesIO(content))
+    img = Image.open(io.BytesIO(content)).convert("RGB")
 
-    label, confidence, probs = svc.predict(img)
+
+    # UPDATED: inference now returns overlay as 4th value
+    label, confidence, probs, overlay_b64 = svc.predict(img)
 
     return PredictResponse(
         label=label,
@@ -53,4 +53,5 @@ async def predict(file: UploadFile = File(...)):
         probs=probs,
         disclaimer=APP_DISCLAIMER,
         model=svc.meta.get("backbone"),
+        gradcam_overlay_png_b64=overlay_b64,  # NEW
     )

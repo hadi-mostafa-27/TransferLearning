@@ -9,6 +9,9 @@ from torchvision import transforms
 import torch.nn as nn
 from torchvision import models
 
+# Grad-CAM helpers
+from app.gradcam import GradCAM, cam_overlay_base64, get_resnet_target_layer
+
 
 class InferenceService:
     def __init__(self, weights_path: str, meta_path: str):
@@ -19,9 +22,7 @@ class InferenceService:
         self.img_size = int(meta["img_size"])
 
         # Convert class keys to int if needed
-        self.idx_to_class = {
-            int(k): v for k, v in meta["classes"].items()
-        }
+        self.idx_to_class = {int(k): v for k, v in meta["classes"].items()}
 
         self.model = build_model(
             num_classes=len(self.idx_to_class),
@@ -33,6 +34,9 @@ class InferenceService:
         self.model.to(self.device)
         self.model.eval()
 
+        # Init Grad-CAM once
+        self.gradcam = GradCAM(self.model, get_resnet_target_layer(self.model))
+
         self.tfm = transforms.Compose([
             transforms.Resize((self.img_size, self.img_size)),
             transforms.ToTensor(),
@@ -42,13 +46,24 @@ class InferenceService:
             ),
         ])
 
-    @torch.no_grad()
     def predict(self, pil_img: Image.Image):
+        """
+        Returns:
+          label (str),
+          confidence (float),
+          probs_named (dict),
+          overlay_b64 (str)  # base64 PNG for Grad-CAM overlay
+        """
+        # Keep the ORIGINAL image for overlay (correct alignment)
         img = pil_img.convert("RGB")
+
+        # Model input (resized + normalized)
         x = self.tfm(img).unsqueeze(0).to(self.device)
 
-        logits = self.model(x)
-        probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
+        # 1) prediction (no gradients)
+        with torch.no_grad():
+            logits = self.model(x)
+            probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
 
         pred_idx = int(np.argmax(probs))
         label = self.idx_to_class[pred_idx]
@@ -59,7 +74,14 @@ class InferenceService:
             for i in range(len(probs))
         }
 
-        return label, confidence, probs_named
+        # 2) Grad-CAM (needs gradients)
+        cam = self.gradcam.generate(x, class_idx=pred_idx)
+
+        # IMPORTANT FIX:
+        # overlay on ORIGINAL image (not on normalized tensor)
+        overlay_b64 = cam_overlay_base64(img, cam)
+
+        return label, confidence, probs_named, overlay_b64
 
 
 # -------------------------------------------------

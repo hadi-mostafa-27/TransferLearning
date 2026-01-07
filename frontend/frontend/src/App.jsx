@@ -24,7 +24,23 @@ const IconPlay = () => (
   </svg>
 );
 
-/* ---------------------- App ---------------------- */
+function ImageModal({ open, title, src, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">{title}</div>
+          <button className="btn-lite" onClick={onClose}>Close</button>
+        </div>
+        <div className="modal-body">
+          <img className="modal-img" src={src} alt={title} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
@@ -32,26 +48,41 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
+  const [activeTab, setActiveTab] = useState("original"); // original | gradcam
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalSrc, setModalSrc] = useState("");
+
   const modelName = useMemo(() => result?.model || "resnet18", [result]);
+
+  const gradcamB64 = result?.gradcam_overlay_png_b64 || "";
+  const gradcamSrc = gradcamB64 ? `data:image/png;base64,${gradcamB64}` : "";
+
+  const openModal = (title, src) => {
+    if (!src) return;
+    setModalTitle(title);
+    setModalSrc(src);
+    setModalOpen(true);
+  };
 
   const selectFile = (f) => {
     setError("");
     setResult(null);
     setFile(f || null);
-    if (!f) {
-      setPreview("");
-      return;
-    }
+    if (!f) return setPreview("");
     setPreview(URL.createObjectURL(f));
   };
 
-  const clearFile = () => selectFile(null);
+  const clearFile = () => {
+    setFile(null);
+    setPreview("");
+    setResult(null);
+    setError("");
+  };
 
   const predict = async () => {
-    if (!file) {
-      setError("Upload an X-ray image first.");
-      return;
-    }
+    if (!file) return setError("Upload an X-ray image first.");
     setLoading(true);
     setError("");
     try {
@@ -64,6 +95,7 @@ export default function App() {
         setResult(null);
       } else {
         setResult(data);
+        setActiveTab("gradcam"); // auto show XAI after prediction
       }
     } catch {
       setError("Network error. Is the backend running on 127.0.0.1:8000 ?");
@@ -79,130 +111,150 @@ export default function App() {
   const pneuP = result?.probs?.PNEUMONIA ?? 0;
 
   return (
-    <div className="container">
-      <div className="shell">
+    <div className="page">
+      <div className="wrap">
 
-        {/* LEFT COLUMN */}
-        <div className="card">
-          <div className="card-inner">
-
-            {/* Header */}
-            <div className="header">
-              <div className="brand">
-                <div className="brand-top">
-                  <div className="logo"><IconBrain /></div>
-                  <div>
-                    <div className="title">MedXfer</div>
-                    <div className="subtitle">
-                      Transfer Learning demo for medical imaging — Chest X-ray Pneumonia Detection
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="badges">
-                <div className="badge"><span className="dot" />FastAPI</div>
-                <div className="badge"><span className="dot" />React</div>
-                <div className="badge"><span className="dot" />{modelName}</div>
-              </div>
-            </div>
-
-            {/* Upload + Preview */}
-            <div className="grid">
-              <div className="panel">
-                <div className="panel-title">Upload <span className="hint">PNG / JPG</span></div>
-
-                <label className="drop">
-                  <input type="file" accept="image/*" onChange={(e) => selectFile(e.target.files?.[0])}/>
-                  <div className="drop-main">
-                    <div className="drop-icon"><IconUpload /></div>
-                    <div className="drop-text">
-                      <b>Click to upload</b>
-                      <span>Frontal chest X-rays recommended</span>
-                    </div>
-                  </div>
-
-                  {file && (
-                    <div className="file-pill">
-                      <div className="name">{file.name}</div>
-                      <button className="icon-btn" onClick={(e)=>{e.preventDefault(); clearFile();}}>Remove</button>
-                    </div>
-                  )}
-                </label>
-
-                <div className="cta-row">
-                  <button className="btn btn-primary" onClick={predict} disabled={loading}>
-                    {loading ? "Analyzing..." : "Run Analysis"} {!loading && <IconPlay />}
-                  </button>
-                  <button className="btn btn-secondary" onClick={clearFile} disabled={!file}>
-                    Clear
-                  </button>
-                </div>
-
-                {error && <div className="toast">{error}</div>}
-              </div>
-
-              <div className="panel">
-                <div className="panel-title">Preview <span className="hint">Local</span></div>
-                <div className={`preview ${loading ? "scanning" : ""}`}>
-                  {preview ? <img src={preview} alt="X-ray preview" /> :
-                    <div className="preview-empty">Upload an image to preview here</div>}
-                  <div className="scanline" />
-                </div>
-                <div className="footer-note">Educational demo only. Not a medical device.</div>
+        {/* HEADER */}
+        <div className="topbar">
+          <div className="brand">
+            <div className="logo"><IconBrain /></div>
+            <div>
+              <div className="title">MedXfer</div>
+              <div className="subtitle">
+                Chest X-ray Pneumonia Detection (Transfer Learning) + Explainability (Grad-CAM)
               </div>
             </div>
           </div>
-        </div>
 
-        {/* TRANSFER LEARNING EXPLANATION (BIG) */}
-        <div className="card tl-card">
-          <div className="card-inner">
-            <h2 className="tl-title">How Transfer Learning Is Applied</h2>
-
-            <p className="tl-text">
-              This system uses <b>Transfer Learning</b> to build a medical image classifier efficiently and reliably.
-              Training a deep CNN from scratch on limited medical data is impractical, so we reuse knowledge from a
-              model trained on a large-scale dataset.
-            </p>
-
-            <p className="tl-text">
-              We start with a <b>ResNet backbone pre-trained on ImageNet</b>. ImageNet enables the network to learn
-              universal visual features such as edges, textures, gradients, and spatial hierarchies.
-            </p>
-
-            <p className="tl-text">
-              The original classification head is <b>replaced</b> with a new layer specific to the medical task
-              (<b>Normal vs Pneumonia</b>). During training:
-            </p>
-
-            <ul className="tl-list">
-              <li>Early convolutional layers are <b>frozen</b> to preserve general visual knowledge</li>
-              <li>The new classifier head is trained on X-ray images</li>
-              <li>Final layers are <b>fine-tuned</b> to adapt to medical patterns</li>
-            </ul>
-
-            <p className="tl-text highlight">
-              Transfer Learning reduces training time, improves generalization on small datasets,
-              and significantly lowers overfitting — making it ideal for healthcare AI applications.
-            </p>
+          <div className="badges">
+            <span className="badge">FastAPI</span>
+            <span className="badge">React</span>
+            <span className="badge">{modelName}</span>
           </div>
         </div>
 
-        {/* RIGHT COLUMN — RESULTS */}
-        <div className="side">
+        {/* MAIN LAYOUT: natural breakpoints via min widths */}
+        <div className="layout">
+
+          {/* LEFT: Upload + Images */}
           <div className="card">
-            <div className="card-inner">
-              <div className="panel-title">Results <span className="hint">Test AUROC ≈ 0.94</span></div>
+            <div className="card-body">
+
+              <div className="row-grid">
+                {/* Upload */}
+                <div className="panel upload">
+                  <div className="panel-title">Upload <span className="hint">PNG/JPG</span></div>
+
+                  <label className="drop">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => selectFile(e.target.files?.[0])}
+                    />
+                    <div className="drop-main">
+                      <div className="drop-icon"><IconUpload /></div>
+                      <div className="drop-text">
+                        <b>Click to upload</b>
+                        <span>Frontal chest X-rays recommended</span>
+                      </div>
+                    </div>
+
+                    {file && (
+                      <div className="file-pill">
+                        <div className="name">{file.name}</div>
+                        <button className="btn-lite" onClick={(e) => { e.preventDefault(); clearFile(); }}>
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </label>
+
+                  <div className="actions">
+                    <button className="btn primary" onClick={predict} disabled={loading}>
+                      {loading ? "Analyzing..." : "Run Analysis"} {!loading && <IconPlay />}
+                    </button>
+                    <button className="btn ghost" onClick={clearFile} disabled={!file && !result}>
+                      Clear
+                    </button>
+                  </div>
+
+                  {error && <div className="alert">{error}</div>}
+                  <div className="footnote">Educational demo only. Not a medical device.</div>
+                </div>
+
+                {/* Images area */}
+                <div className="panel images">
+                  <div className="panel-title">
+                    Images <span className="hint">Click to expand</span>
+                  </div>
+
+                  {/* Tabs appear on smaller screens; on large they still help UX */}
+                  <div className="tabs">
+                    <button
+                      className={`tab ${activeTab === "original" ? "active" : ""}`}
+                      onClick={() => setActiveTab("original")}
+                    >
+                      Original
+                    </button>
+                    <button
+                      className={`tab ${activeTab === "gradcam" ? "active" : ""}`}
+                      onClick={() => setActiveTab("gradcam")}
+                      disabled={!gradcamSrc}
+                      title={!gradcamSrc ? "Run analysis first" : "Grad-CAM"}
+                    >
+                      Grad-CAM
+                    </button>
+                  </div>
+
+                  {activeTab === "original" ? (
+                    <button
+                      className={`media ${loading ? "scanning" : ""}`}
+                      onClick={() => openModal("Original X-ray", preview)}
+                      disabled={!preview}
+                    >
+                      {preview ? (
+                        <img src={preview} alt="Original X-ray" />
+                      ) : (
+                        <div className="empty">Upload an image to preview here</div>
+                      )}
+                      <div className="scanline" />
+                    </button>
+                  ) : (
+                    <button
+                      className="media"
+                      onClick={() => openModal("Grad-CAM Overlay", gradcamSrc)}
+                      disabled={!gradcamSrc}
+                    >
+                      {gradcamSrc ? (
+                        <img src={gradcamSrc} alt="Grad-CAM overlay" />
+                      ) : (
+                        <div className="empty">Run analysis to generate Grad-CAM</div>
+                      )}
+                    </button>
+                  )}
+
+                  <div className="xai-note">
+                    Grad-CAM highlights regions that influenced the prediction.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Results */}
+          <div className="card">
+            <div className="card-body">
+              <div className="panel-title">Results <span className="hint">Clinical-style metrics</span></div>
 
               {!result ? (
-                <div className="disclaimer">
-                  Upload an X-ray and click <b>Run Analysis</b> to see predictions and probabilities.
+                <div className="muted-block">
+                  Upload an X-ray and click <b>Run Analysis</b>.
                 </div>
               ) : (
-                <div className="big">
-                  <div className="diagnosis">
-                    <div className={`label ${label === "PNEUMONIA" ? "bad" : "good"}`}>{label}</div>
-                    <div className="conf">
+                <>
+                  <div className="result-top">
+                    <div className={`result-label ${label === "PNEUMONIA" ? "bad" : "good"}`}>{label}</div>
+                    <div className="result-conf">
                       Confidence<br/><b>{(conf * 100).toFixed(2)}%</b>
                     </div>
                   </div>
@@ -212,24 +264,47 @@ export default function App() {
                   </div>
 
                   <div className="bars">
-                    <div>
-                      <div className="row"><div className="k">NORMAL</div><div className="v">{(normalP*100).toFixed(2)}%</div></div>
-                      <div className="track"><div className="fill" style={{ width: `${normalP*100}%` }} /></div>
+                    <div className="bar">
+                      <div className="bar-row"><span>NORMAL</span><span>{(normalP * 100).toFixed(2)}%</span></div>
+                      <div className="track"><div className="fill" style={{ width: `${normalP * 100}%` }} /></div>
                     </div>
-                    <div>
-                      <div className="row"><div className="k">PNEUMONIA</div><div className="v">{(pneuP*100).toFixed(2)}%</div></div>
-                      <div className="track"><div className="fill" style={{ width: `${pneuP*100}%` }} /></div>
+                    <div className="bar">
+                      <div className="bar-row"><span>PNEUMONIA</span><span>{(pneuP * 100).toFixed(2)}%</span></div>
+                      <div className="track"><div className="fill" style={{ width: `${pneuP * 100}%` }} /></div>
                     </div>
                   </div>
 
-                  <div className="disclaimer">{result.disclaimer}</div>
-                </div>
+                  <div className="small">{result.disclaimer}</div>
+                </>
               )}
             </div>
           </div>
         </div>
 
+        {/* EXPLANATION */}
+        <div className="card">
+          <div className="card-body">
+            <h2 className="section-title">How Transfer Learning Is Applied</h2>
+            <p className="p">
+              We reuse a <b>ResNet backbone pre-trained on ImageNet</b> as a feature extractor, then train a new head for
+              <b> Normal vs Pneumonia</b>.
+            </p>
+            <ul className="list">
+              <li>Early layers are usually frozen to preserve general features</li>
+              <li>The classifier learns medical patterns from X-rays</li>
+              <li>Grad-CAM adds explainability by showing influential regions</li>
+            </ul>
+          </div>
+        </div>
+
       </div>
+
+      <ImageModal
+        open={modalOpen}
+        title={modalTitle}
+        src={modalSrc}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   );
 }
