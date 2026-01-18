@@ -6,6 +6,7 @@ Educational AI project demonstrating how transfer learning can be applied to med
 This project is for educational and research purposes only. It is not a medical device and must not be used for clinical decision-making.
 
 ---
+<img width="1840" height="832" alt="image" src="https://github.com/user-attachments/assets/d2d34c77-1467-475e-aafa-0ad36deec741" />
 
 ## Project Overview
 
@@ -254,5 +255,6 @@ Focus areas:
 ## License
 
 This project is released for educational and academic use only.
+
 
 
